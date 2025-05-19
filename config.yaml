@@ -1,0 +1,13 @@
+search-dir: ".\\"
+# May be the full file name a portion of it
+# wildcards or other regex is not supported at this time
+spreadsheet-pattern: "roster.csv" 
+# a list of columns to include in the printout
+columns: 
+- NAME
+- SESSION
+- CONTACT
+# Prints one sheet per unique value in the below column
+class_column_name: SESSION
+# appended to the contents of the class column name 
+title_suffix: "Class Roster"
