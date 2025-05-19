@@ -11,7 +11,7 @@ from fpdf import FPDF
 logger = logging.getLogger("roster-printer")
 
 # debug settings
-DEBUG = False
+DEBUG = os.getenv("ROSTER_PRINTER_DEBUG", "False") == "True"
 PRINT_ROSTERS = not DEBUG
 USE_TEMPDIR = not DEBUG
 LOG_LEVEL = logging.DEBUG if DEBUG else logging.INFO
@@ -104,10 +104,10 @@ def print_roster(roster: pd.DataFrame, title: str, directory: os.PathLike) -> No
     roster_to_pdf(roster, tmp_file_path, title=title)
 
     if PRINT_ROSTERS is True:
-        logger.debug(f"printing {title}.pdf")
+        logger.info(f"printing {title}.pdf")
         os.startfile(tmp_file_path, "print")
     else:
-        logger.debug(f"opening {title}.pdf")
+        logger.info(f"opening {title}.pdf")
         os.startfile(tmp_file_path, "open")
 
 
@@ -131,7 +131,7 @@ def print_all_sessions(roster: pd.DataFrame, class_column_name: str, title_suffi
             time.sleep(10)
 
     else:
-        tempdir = "temp"
+        tempdir = ".temp"
         if not os.path.exists(tempdir):
             os.mkdir(tempdir)
         for session in pd.unique(roster[class_column_name].values):
@@ -140,6 +140,8 @@ def print_all_sessions(roster: pd.DataFrame, class_column_name: str, title_suffi
             session_df = roster.query(f"{class_column_name} == @session")
             logger.debug(f"{session_df}")
             print_roster(session_df, title=f"{session} {title_suffix}", directory=tempdir)
+        # # this delay is just so that a programmer can see the files for a few momnents
+        # time.sleep(10)
     
 if __name__ == "__main__":
     # configure logging
@@ -153,13 +155,26 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
     check_for_required_config(config)
 
-    newest_spreadsheet = find_latest_spreadsheet(config["search-dir"],
+    newest_spreadsheet: str = find_latest_spreadsheet(config["search-dir"],
                                                  config["spreadsheet-pattern"])
+    # splitext() returns a tuple of (filename, extension)
+    # we only want the extension, so we take the second element
+    # and slice off the first character (the dot)
+    extension = os.path.splitext(newest_spreadsheet)[1][1:]
+    logger.debug(f"{extension=}")
 
-    with open(newest_spreadsheet, encoding="utf-8") as f:
-        roster_df = pd.read_csv(f)
+    with open(newest_spreadsheet, "rb") as f:
         logger.debug(f"Read roster_df from {newest_spreadsheet}")
-        logger.debug(roster_df)
+        if extension == "csv":
+            roster_df = pd.read_csv(f)
+        elif extension in ["xls", "xlsx", "xlsm", "xlsb", "odf", "ods", "odt"]: 
+            # list taken from https://pandas.pydata.org/docs/reference/api/pandas.read_excel.html
+            roster_df = pd.read_excel(f)
+        else:
+            logger.error(f"File type not supported: {newest_spreadsheet}")
+            raise(ValueError(f"File type not supported: {newest_spreadsheet}"))
+
+    logger.debug(f"{roster_df=}")
 
     roster_df = filter_roster_columns(roster_df, config["columns"])
 

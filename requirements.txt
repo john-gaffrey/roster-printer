@@ -1,3 +1,5 @@
 pyyaml
 fpdf
 pandas
+odfpy
+xlrd

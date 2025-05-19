@@ -1,7 +1,7 @@
 search-dir: ".\\"
 # May be the full file name a portion of it
-# wildcards or other regex is not supported at this time
-spreadsheet-pattern: "roster.csv" 
+# wildcards (*) or other regex are not supported at this time
+spreadsheet-pattern: "roster." 
 # a list of columns to include in the printout
 columns: 
 - NAME
