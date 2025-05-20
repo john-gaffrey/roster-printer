@@ -1,7 +1,10 @@
 # roster-printer
 A helper utility to fetch, filter, format and print roster spreadsheets for a mutli-classroom environment 
 
-usage:
+Tested on Python 3.11
+
+Usage:
+* download source
 * configure config.yaml to match your environment
 * ensure the correct printer is configured as the default in the system settings.
 * install python 3 and pip, with or without a venv
