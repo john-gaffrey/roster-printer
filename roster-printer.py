@@ -207,7 +207,7 @@ if __name__ == "__main__":
         for modify_data in config["modify-columns"]:
             if modify_data["new-name"] in roster_df.columns:
                 raise ValueError(f"new column name {modify_data['new-name']} already exists in roster")
-            # merge the columns
+            # apply modifications
             logger.debug(f"merging columns {modify_data['old-columns']} into {modify_data['new-name']}")
             roster_df[modify_data["new-name"]] = roster_df[modify_data["old-columns"]].apply(
                 lambda x: modify_data["separator"].join(x.dropna().astype(str)), axis=1)
