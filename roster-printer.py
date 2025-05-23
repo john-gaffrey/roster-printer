@@ -1,21 +1,36 @@
 """Prints rosters"""
+
+import argparse
 import os
 import sys
 import logging
 import time
+from tkinter.messagebox import askyesno
 from datetime import datetime
 from tempfile import TemporaryDirectory
 import yaml
 import pandas as pd
 from fpdf import FPDF
 
-logger = logging.getLogger("roster-printer")
+APP_NAME = "roster-printer"
+
+logger = logging.getLogger(APP_NAME)
 
 # debug flags
 DEBUG = os.getenv("ROSTER_PRINTER_DEBUG", "False") == "True"
 PRINT_ROSTERS = not DEBUG
 USE_TEMPDIR = not DEBUG
 LOG_LEVEL = logging.DEBUG if DEBUG else logging.INFO
+
+def parse_args(args):
+    """
+    Parses args
+    """
+    parser = argparse.ArgumentParser(description="Prints rosters")
+    parser.add_argument("--confirm", #type=bool,
+                        action="store_const", const=True,
+                        help="Prompt to print")
+    return parser.parse_args(args)
 
 def find_latest_spreadsheet(search_dir: str, search_str: str) -> os.PathLike:
     """
@@ -168,17 +183,28 @@ def print_all_sessions(roster: pd.DataFrame, config: dict) -> None:
             print_roster(session_df, title=f"{session} {config['title-suffix']}", directory=tempdir)
         time.sleep(30)
     
+
 if __name__ == "__main__":
     # configure logging
     logging.basicConfig(stream=sys.stdout, level=LOG_LEVEL)
 
+    args = parse_args(sys.argv[1:])
+
     # get config
     CONFIG_FILE = os.getenv("CONFIG_FILE", "./config.yaml")
     logger.debug(f"{CONFIG_FILE=}")
-
     with open(CONFIG_FILE, encoding="utf-8") as f:
         config = yaml.safe_load(f)
     check_for_required_config(config)
+
+    if args.confirm:
+        response = askyesno(
+            message="Are you ready to print class rosters? If you cancel "
+                    "this message, you will have to start this program again. ",
+            title=APP_NAME)
+        if not response:
+            logger.debug("Exiting due to cancellation")
+            sys.exit(0)
 
     newest_spreadsheet = find_latest_spreadsheet(config["search-dir"],
                                                  config["spreadsheet-pattern"])
@@ -217,3 +243,4 @@ if __name__ == "__main__":
     print_all_sessions(roster_df, config)
 
     logger.info("Printing complete! Please close the window")
+    
