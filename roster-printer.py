@@ -210,11 +210,7 @@ if __name__ == "__main__":
             # merge the columns
             logger.debug(f"merging columns {merge['old-columns']} into {merge['new-name']}")
             roster_df[merge["new-name"]] = roster_df[merge["old-columns"]].apply(
-                lambda x: ' '.join(x.dropna().astype(str)), axis=1)
-
-            # drop the old columns
-            logger.debug(f"dropping columns {merge['old-columns']}")
-            roster_df = roster_df.drop(columns=merge["old-columns"])
+                lambda x: merge["delimiter"].join(x.dropna().astype(str)), axis=1)
         logger.debug(f"{roster_df.info()=}")
 
     print_all_sessions(roster_df, config)

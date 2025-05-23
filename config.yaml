@@ -1,13 +1,36 @@
 search-dir: ".\\"
 # May be the full file name a portion of it
 # wildcards (*) or other regex are not supported at this time
-spreadsheet-pattern: "roster." 
-# a list of columns to include in the printout
-columns: 
-- NAME
-- SESSION
-- CONTACT
+spreadsheet-pattern: "db-output" 
+# column modifications
+# can merge or just rename by including only one old-column
+# the new column name must not exist already
+# the columns are joined in the order listed
+# and separated by the specified seperator
+modify-columns:
+- new-name: Name
+  old-columns: 
+    - "[Child] First Name"
+    - "[Child] Last Name"
+  seperator: " "
+- new-name: Contact
+  old-columns: 
+    - "[Parent] First Name"
+    - "[Parent] Last Name"
+  seperator: " "
+- new-name: Contact Number
+  old-columns: 
+    - "[Parent] Phone"
+  seperator: " "
+# a list of columns to print in the order they should be printed
+# the columns must be in the orignnal spreadsheet
+# OR the new column names from the modify-columns list
+columns-to-print: 
+- Name
+- Contact
+- Contact Number
 # Prints one sheet per unique value in the below column
-class_column_name: SESSION
+# does not need to be in the columns list
+class-column-name: Session
 # appended to the contents of the class column name 
-title_suffix: "Class Roster"
+title-suffix: "Roster"
