@@ -1,5 +1,5 @@
 pyyaml
-fpdf
+fpdf2
 pandas
 odfpy
 xlrd

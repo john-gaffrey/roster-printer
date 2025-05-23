@@ -204,13 +204,16 @@ if __name__ == "__main__":
     if "modify-columns" in config.keys():
         logger.debug("modifying columns")
         # roster_df = modify_roster_columns(roster_df, config["modify-columns"])
-        for merge in config["modify-columns"]:
-            if merge["new-name"] in roster_df.columns:
-                raise ValueError(f"new column name {merge['new-name']} already exists in roster")
-            # merge the columns
-            logger.debug(f"merging columns {merge['old-columns']} into {merge['new-name']}")
-            roster_df[merge["new-name"]] = roster_df[merge["old-columns"]].apply(
-                lambda x: merge["delimiter"].join(x.dropna().astype(str)), axis=1)
+        for modify_data in config["modify-columns"]:
+            if modify_data["new-name"] in roster_df.columns:
+                raise ValueError(f"new column name {modify_data['new-name']} already exists in roster")
+            # apply modifications
+            logger.debug(f"merging columns {modify_data['old-columns']} into {modify_data['new-name']}")
+            roster_df[modify_data["new-name"]] = roster_df[modify_data["old-columns"]].apply(
+                lambda x: modify_data["separator"].join(x.dropna().astype(str)), axis=1)
+
         logger.debug(f"{roster_df.info()=}")
 
     print_all_sessions(roster_df, config)
+
+    logger.info("Printing complete! Please close the window")
