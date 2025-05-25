@@ -59,31 +59,6 @@ def check_for_required_config(config_to_check: dict) -> None:
 
     logger.debug("config has all required keys")
 
-def modify_roster_columns(roster: pd.DataFrame, columns_to_merge: list[dict[str]]) -> pd.DataFrame:
-    """Returns a DataFrame with the all of the specified columns to be updated.
-       columns_to_merge is a list of dicts, where each dict has the keys:
-       'new-name' (the name of the new column) and 'old-columns' (a list of columns to merge)
-       This can also be used to rename columns by setting 'old-columns' to a list of 1 column"""
-    result = roster.copy()
-
-    for merge in columns_to_merge:
-        if "new-name" not in merge.keys() or "old-columns" not in merge.keys():
-            raise KeyError("merge dict must contain keys 'new-name' and 'old-columns'")
-        if merge["new-name"] in roster.columns:
-            raise ValueError(f"new column name {merge['new-name']} already exists in roster")
-        # merge the columns
-        logger.debug(f"merging columns {merge['old-columns']} into {merge['new-name']}")
-        result[merge["new-name"]] = roster[merge["old-columns"][0]]
-        # result[merge["new-name"]] = roster[merge["old-columns"]].apply(
-        #     lambda x: ' '.join(x.dropna().astype(str)), axis=1)
-        
-        # drop the old columns
-        logger.debug(f"dropping columns {merge['old-columns']}")
-        result = roster.drop(columns=merge["old-columns"])
-
-    logger.debug(result.info())
-    return result
-
 def roster_to_pdf(roster: pd.DataFrame, file_path, title) -> None:
     """Creates a nicly formatted pdf of the `roster` at `file_path`"""
 
@@ -111,6 +86,7 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title) -> None:
         # must combine them for this to work nicely
         for data_row in [list(roster)] + roster.values.tolist():
             row = table.row()
+
             for datum in data_row:
                 row.cell(datum)
 
@@ -132,7 +108,7 @@ def print_roster(roster: pd.DataFrame, title: str, directory: os.PathLike) -> No
         os.startfile(tmp_file_path, "open")
 
 
-def print_all_sessions(roster: pd.DataFrame, config: dict) -> None:
+def print_all_sessions(roster: pd.DataFrame) -> None:
     """Prints all unique sessions in roster, 1 per page"""
     # to use the os print utils, the item to print must be a file
     # using TemporaryDirectory() is nicer for cleanup
@@ -166,16 +142,16 @@ def print_all_sessions(roster: pd.DataFrame, config: dict) -> None:
             session_df = session_df[config["columns-to-print"]]
             logger.debug(f"{session_df}")
             print_roster(session_df, title=f"{session} {config['title-suffix']}", directory=tempdir)
+        logging.info("All files should be opened now, waiting 30s before exiting")
         time.sleep(30)
     
 if __name__ == "__main__":
     # configure logging
     logging.basicConfig(stream=sys.stdout, level=LOG_LEVEL)
 
-    # get config
+    # get config, accessed globally
     CONFIG_FILE = os.getenv("CONFIG_FILE", "./config.yaml")
     logger.debug(f"{CONFIG_FILE=}")
-
     with open(CONFIG_FILE, encoding="utf-8") as f:
         config = yaml.safe_load(f)
     check_for_required_config(config)
@@ -203,7 +179,6 @@ if __name__ == "__main__":
 
     if "modify-columns" in config.keys():
         logger.debug("modifying columns")
-        # roster_df = modify_roster_columns(roster_df, config["modify-columns"])
         for modify_data in config["modify-columns"]:
             if modify_data["new-name"] in roster_df.columns:
                 raise ValueError(f"new column name {modify_data['new-name']} already exists in roster")
@@ -214,6 +189,6 @@ if __name__ == "__main__":
 
         logger.debug(f"{roster_df.info()=}")
 
-    print_all_sessions(roster_df, config)
+    print_all_sessions(roster_df)
 
     logger.info("Printing complete! Please close the window")
