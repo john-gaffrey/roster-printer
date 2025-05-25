@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 import yaml
 import pandas as pd
 from fpdf import FPDF
+import dateparser
 
 logger = logging.getLogger("roster-printer")
 
@@ -16,6 +17,20 @@ DEBUG = os.getenv("ROSTER_PRINTER_DEBUG", "False") == "True"
 PRINT_ROSTERS = not DEBUG
 USE_TEMPDIR = not DEBUG
 LOG_LEVEL = logging.DEBUG if DEBUG else logging.INFO
+
+class RosterPDF(FPDF):
+    """Adds footer to base class"""
+    def __init__(self, footer_str="", **kwargs):
+        super().__init__(**kwargs)
+        self.footer_str = footer_str
+
+    def footer(self):
+        # Position cursor at 1.5 cm from bottom:
+        self.set_y(-15)
+        # Setting font: helvetica italic 8
+        self.set_font("helvetica", style="I", size=8)
+        # Printing page number:
+        self.cell(0, 10, self.footer_str, align="R")
 
 def find_latest_spreadsheet(search_dir: str, search_str: str) -> os.PathLike:
     """
@@ -59,25 +74,34 @@ def check_for_required_config(config_to_check: dict) -> None:
 
     logger.debug("config has all required keys")
 
-def roster_to_pdf(roster: pd.DataFrame, file_path, title) -> None:
+def roster_to_pdf(roster: pd.DataFrame, file_path, title, **kwargs) -> None:
     """Creates a nicly formatted pdf of the `roster` at `file_path`"""
 
-    # # remove use-extra-row columns
-    # extra_rows_df = pd.DataFrame()
-    # for col in config['use-extra-row']:
-    #     extra_rows_df[col] = roster.pop(col)
+    modified_datetime = datetime.fromtimestamp(kwargs.get("spreadsheet_mtime")).strftime("%m/%d/%y, %H:%M:%S")
+    print_datetime = kwargs.get("date_printed").strftime("%m/%d/%y, %H:%M:%S")
+    session_date_str = kwargs.get("session_date_str", "")
+    footer_strs = []
+    if config.get("show-print-date", ""):
+        footer_strs.append(f"Print time: {print_datetime}")
+    if config.get("show-modified-time", ""):
+        footer_strs.append(f"Data last modified: {modified_datetime}")
+    footer_str = ", ".join(footer_strs)
 
     normal_cols = [x for x in config['columns-to-print'] if x not in config.get('use-extra-row', [])]
 
     # modified example from https://py-pdf.github.io/fpdf2/Maths.html#using-pandas
-    pdf = FPDF(orientation=config.get("orientation", "P"), format="Letter", unit="pt")
+    pdf = RosterPDF(orientation=config.get("orientation", "P"),
+               format="Letter",
+               unit="pt",
+               footer_str=footer_str)
     pdf.set_title(title)
     pdf.add_page()
 
     # create header
     pdf.set_font('helvetica', size=24)
     pdf.cell(text=title, new_y="NEXT", align="C", center=True)
-    pdf.cell(text=datetime.today().strftime("%m/%d/%Y"), new_y="NEXT", align="C", center=True)
+    if session_date_str:
+        pdf.cell(text=session_date_str, new_y="NEXT", align="C", center=True)
     pdf.ln(20)
 
     # add table
@@ -110,11 +134,11 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title) -> None:
     logger.debug(f"created pdf {file_path}")
 
 
-def print_roster(roster: pd.DataFrame, title: str, directory: os.PathLike) -> None:
+def print_roster(roster: pd.DataFrame, title: str, tempdir: os.PathLike, **kwargs) -> None:
     """Prints a `roster` with the title: `title`"""
 
-    tmp_file_path = os.path.join(directory, f"{title}.pdf")
-    roster_to_pdf(roster, tmp_file_path, title=title)
+    tmp_file_path = os.path.join(tempdir, f"{title}.pdf")
+    roster_to_pdf(roster, tmp_file_path, title=title, **kwargs)
 
     if PRINT_ROSTERS is True:
         logger.info(f"printing {title}.pdf")
@@ -124,8 +148,9 @@ def print_roster(roster: pd.DataFrame, title: str, directory: os.PathLike) -> No
         os.startfile(tmp_file_path, "open")
 
 
-def print_all_sessions(roster: pd.DataFrame) -> None:
-    """Prints all unique sessions in roster, 1 per page"""
+def print_all_sessions(roster: pd.DataFrame, **kwargs) -> None:
+    """Prints all unique sessions in roster, max one per page"""
+
     # to use the os print utils, the item to print must be a file
     # using TemporaryDirectory() is nicer for cleanup
     # but hard to debug, hence the flag
@@ -139,7 +164,7 @@ def print_all_sessions(roster: pd.DataFrame) -> None:
                 session_df = roster.query(f"{config['class-column-name']} == @session")[config["columns-to-print"]]
                 # session_df = filter_roster_columns(roster_df, config["columns-to-print"])
                 logger.debug(f"{session_df}")
-                print_roster(session_df, title=f"{session} {config['title-suffix']}", directory=tempdir)
+                print_roster(session_df, title=f"{session} {config['title-suffix']}", tempdir=tempdir, **kwargs)
             # Without this wait, the files get deleted before the print spooler gets them
             logging.info("waiting for print spooler to receive files")
             time.sleep(10)
@@ -157,10 +182,10 @@ def print_all_sessions(roster: pd.DataFrame) -> None:
             # filter to just the desired columns
             session_df = session_df[config["columns-to-print"]]
             logger.debug(f"{session_df}")
-            print_roster(session_df, title=f"{session} {config['title-suffix']}", directory=tempdir)
+            print_roster(session_df, title=f"{session} {config['title-suffix']}", tempdir=tempdir, **kwargs)
         logging.info("All files should be opened now, waiting 30s before exiting")
         time.sleep(30)
-    
+
 if __name__ == "__main__":
     # configure logging
     logging.basicConfig(stream=sys.stdout, level=LOG_LEVEL)
@@ -174,6 +199,12 @@ if __name__ == "__main__":
 
     newest_spreadsheet = find_latest_spreadsheet(config["search-dir"],
                                                  config["spreadsheet-pattern"])
+    
+    # start collecting metadata
+    metadata = {}
+    metadata['spreadsheet_mtime'] = os.path.getmtime(newest_spreadsheet)
+    metadata['date_printed'] = datetime.now()
+
     # splitext() returns a tuple of (filename, extension)
     # we only want the extension, so we take the second element
     # and slice off the first character (the dot)
@@ -192,6 +223,11 @@ if __name__ == "__main__":
             raise(ValueError(f"File type not supported: {newest_spreadsheet}"))
 
     logger.debug(f"{roster_df=}")
+    session_date = roster_df[config.get("date-column")].values[0]
+    if config.get('date-format', ""):
+        metadata['session_date_str'] = dateparser.parse(session_date).strftime(config['date-format'])
+    else:
+        metadata['session_date_str'] = session_date
 
     if "modify-columns" in config.keys():
         logger.debug("modifying columns")
@@ -205,6 +241,6 @@ if __name__ == "__main__":
 
         logger.debug(f"{roster_df.info()=}")
 
-    print_all_sessions(roster_df)
+    print_all_sessions(roster_df, **metadata)
 
     logger.info("Printing complete! Please close the window")
