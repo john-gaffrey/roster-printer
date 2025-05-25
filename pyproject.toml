@@ -1,2 +1,3 @@
 [tool.pylint]
 disable = ["W1514","W1203"]
+max-line-length = "120"

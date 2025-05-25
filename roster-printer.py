@@ -27,9 +27,7 @@ class RosterPDF(FPDF):
     def footer(self):
         # Position cursor at 1.5 cm from bottom:
         self.set_y(-15)
-        # Setting font: helvetica italic 8
         self.set_font("helvetica", style="I", size=8)
-        # Printing page number:
         self.cell(0, 10, self.footer_str, align="R")
 
 def find_latest_spreadsheet(search_dir: str, search_str: str) -> os.PathLike:
@@ -117,7 +115,6 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title, **kwargs) -> None:
         # must combine them for this to work nicely
         for data_row in [normal_cols] + roster.values.tolist():
             row = table.row()
-
             for n, datum in enumerate(data_row):
                 if n >= len(normal_cols):
                     # FIXME: keep correct shading.
@@ -129,7 +126,6 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title, **kwargs) -> None:
                 else:
                     row.cell(datum)
 
-            
     pdf.output(file_path)
     logger.debug(f"created pdf {file_path}")
 
@@ -199,7 +195,7 @@ if __name__ == "__main__":
 
     newest_spreadsheet = find_latest_spreadsheet(config["search-dir"],
                                                  config["spreadsheet-pattern"])
-    
+
     # start collecting metadata
     metadata = {}
     metadata['spreadsheet_mtime'] = os.path.getmtime(newest_spreadsheet)
@@ -220,7 +216,7 @@ if __name__ == "__main__":
             roster_df = pd.read_excel(f)
         else:
             logger.error(f"File type not supported: {newest_spreadsheet}")
-            raise(ValueError(f"File type not supported: {newest_spreadsheet}"))
+            raise ValueError(f"File type not supported: {newest_spreadsheet}")
 
     logger.debug(f"{roster_df=}")
     session_date = roster_df[config.get("date-column")].values[0]
