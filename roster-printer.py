@@ -62,8 +62,15 @@ def check_for_required_config(config_to_check: dict) -> None:
 def roster_to_pdf(roster: pd.DataFrame, file_path, title) -> None:
     """Creates a nicly formatted pdf of the `roster` at `file_path`"""
 
+    # # remove use-extra-row columns
+    # extra_rows_df = pd.DataFrame()
+    # for col in config['use-extra-row']:
+    #     extra_rows_df[col] = roster.pop(col)
+
+    normal_cols = [x for x in config['columns-to-print'] if x not in config.get('use-extra-row', [])]
+
     # modified example from https://py-pdf.github.io/fpdf2/Maths.html#using-pandas
-    pdf = FPDF(orientation="P", format="Letter", unit="pt")
+    pdf = FPDF(orientation=config.get("orientation", "P"), format="Letter", unit="pt")
     pdf.set_title(title)
     pdf.add_page()
 
@@ -84,12 +91,21 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title) -> None:
         # fpdf table expects the header to be in the first row
         # in an iterable. Dataframes store them seperately, so we
         # must combine them for this to work nicely
-        for data_row in [list(roster)] + roster.values.tolist():
+        for data_row in [normal_cols] + roster.values.tolist():
             row = table.row()
 
-            for datum in data_row:
-                row.cell(datum)
+            for n, datum in enumerate(data_row):
+                if n >= len(normal_cols):
+                    # FIXME: keep correct shading.
+                    if not pd.isna(datum):
+                        extra_row = table.row(style=row.style)
+                        extra_row.cell(datum, colspan=len(normal_cols))
+                elif pd.isna(datum):
+                    row.cell("")
+                else:
+                    row.cell(datum)
 
+            
     pdf.output(file_path)
     logger.debug(f"created pdf {file_path}")
 
