@@ -5,7 +5,11 @@ Tested on Python 3.11
 
 Usage:
 * download source
-* configure config.yaml to match your environment
+* copy or rename `config_example.yaml` into `config.yaml` and modify to match your environment
+* On Windows, ensure that a program is installed that adds the `print` option to the right-click menu for `.pdf` files.
+    * Edge does not work
+    * Adobe and Sumatra do.
+    * ensure that your desired program is set as the default open for `.pdf`.
 * ensure the correct printer is configured as the default in the system settings.
 * install python 3 and pip, with or without a venv
     * if using a venv, mnake sure to edit `roster-printer.bat` or `roster-printer.sh`to point to the venv'd `python`
