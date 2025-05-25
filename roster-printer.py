@@ -106,21 +106,33 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title, **kwargs) -> None:
     pdf.set_font('helvetica', size=12)
     with pdf.table(
         borders_layout="MINIMAL",
-        cell_fill_color=200,
-        cell_fill_mode="ROWS",
+        # cell_fill_color=200,
+        # cell_fill_mode="ROWS", # this doesn't work when I want two rows with the same color
         text_align="CENTER",
     ) as table:
+        # get current style for the table
+        fontface = pdf.font_face() 
+
         # fpdf table expects the header to be in the first row
         # in an iterable. Dataframes store them seperately, so we
         # must combine them for this to work nicely
-        for data_row in [normal_cols] + roster.values.tolist():
+        for n, data_row in enumerate([normal_cols] + roster.values.tolist()):
             row = table.row()
+            # this works
+            # so I need to enumerate it and count.
+            # this works.
+            if n % 2 == 0:
+                fontface.fill_color = 200 # shaded gray
+            else:
+                fontface.fill_color = 255 # white
+
             for n, datum in enumerate(data_row):
                 if n >= len(normal_cols):
                     # FIXME: keep correct shading.
                     if not pd.isna(datum):
                         extra_row = table.row(style=row.style)
-                        extra_row.cell(datum, colspan=len(normal_cols))
+                        
+                        extra_row.cell(datum, colspan=len(normal_cols),style=fontface, )
                 elif pd.isna(datum):
                     row.cell("")
                 else:
