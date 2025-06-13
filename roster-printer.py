@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 import yaml
 import pandas as pd
 from fpdf import FPDF
+import dateparser
 
 logger = logging.getLogger("roster-printer")
 
@@ -16,6 +17,18 @@ DEBUG = os.getenv("ROSTER_PRINTER_DEBUG", "False") == "True"
 PRINT_ROSTERS = not DEBUG
 USE_TEMPDIR = not DEBUG
 LOG_LEVEL = logging.DEBUG if DEBUG else logging.INFO
+
+class RosterPDF(FPDF):
+    """Adds footer to base class"""
+    def __init__(self, footer_str="", **kwargs):
+        super().__init__(**kwargs)
+        self.footer_str = footer_str
+
+    def footer(self):
+        # Position cursor at 1.5 cm from bottom:
+        self.set_y(-15)
+        self.set_font("helvetica", style="I", size=8)
+        self.cell(0, 10, self.footer_str, align="R")
 
 def find_latest_spreadsheet(search_dir: str, search_str: str) -> os.PathLike:
     """
@@ -59,70 +72,80 @@ def check_for_required_config(config_to_check: dict) -> None:
 
     logger.debug("config has all required keys")
 
-def modify_roster_columns(roster: pd.DataFrame, columns_to_merge: list[dict[str]]) -> pd.DataFrame:
-    """Returns a DataFrame with the all of the specified columns to be updated.
-       columns_to_merge is a list of dicts, where each dict has the keys:
-       'new-name' (the name of the new column) and 'old-columns' (a list of columns to merge)
-       This can also be used to rename columns by setting 'old-columns' to a list of 1 column"""
-    result = roster.copy()
-
-    for merge in columns_to_merge:
-        if "new-name" not in merge.keys() or "old-columns" not in merge.keys():
-            raise KeyError("merge dict must contain keys 'new-name' and 'old-columns'")
-        if merge["new-name"] in roster.columns:
-            raise ValueError(f"new column name {merge['new-name']} already exists in roster")
-        # merge the columns
-        logger.debug(f"merging columns {merge['old-columns']} into {merge['new-name']}")
-        result[merge["new-name"]] = roster[merge["old-columns"][0]]
-        # result[merge["new-name"]] = roster[merge["old-columns"]].apply(
-        #     lambda x: ' '.join(x.dropna().astype(str)), axis=1)
-        
-        # drop the old columns
-        logger.debug(f"dropping columns {merge['old-columns']}")
-        result = roster.drop(columns=merge["old-columns"])
-
-    logger.debug(result.info())
-    return result
-
-def roster_to_pdf(roster: pd.DataFrame, file_path, title) -> None:
+def roster_to_pdf(roster: pd.DataFrame, file_path, title, **kwargs) -> None:
     """Creates a nicly formatted pdf of the `roster` at `file_path`"""
 
+    modified_datetime = datetime.fromtimestamp(kwargs.get("spreadsheet_mtime")).strftime("%m/%d/%y, %H:%M:%S")
+    print_datetime = kwargs.get("date_printed").strftime("%m/%d/%y, %H:%M:%S")
+    session_date_str = kwargs.get("session_date_str", "")
+    footer_strs = []
+    if config.get("show-print-date", ""):
+        footer_strs.append(f"Print time: {print_datetime}")
+    if config.get("show-modified-time", ""):
+        footer_strs.append(f"Data last modified: {modified_datetime}")
+    footer_str = ", ".join(footer_strs)
+
+    normal_cols = [x for x in config['columns-to-print'] if x not in config.get('use-extra-row', [])]
+
     # modified example from https://py-pdf.github.io/fpdf2/Maths.html#using-pandas
-    pdf = FPDF(orientation="P", format="Letter", unit="pt")
+    pdf = RosterPDF(orientation=config.get("orientation", "P"),
+               format="Letter",
+               unit="pt",
+               footer_str=footer_str)
     pdf.set_title(title)
     pdf.add_page()
 
     # create header
     pdf.set_font('helvetica', size=24)
     pdf.cell(text=title, new_y="NEXT", align="C", center=True)
-    pdf.cell(text=datetime.today().strftime("%m/%d/%Y"), new_y="NEXT", align="C", center=True)
+    if session_date_str:
+        pdf.cell(text=session_date_str, new_y="NEXT", align="C", center=True)
     pdf.ln(20)
 
     # add table
     pdf.set_font('helvetica', size=12)
     with pdf.table(
         borders_layout="MINIMAL",
-        cell_fill_color=200,
-        cell_fill_mode="ROWS",
+        # cell_fill_color=200,
+        # cell_fill_mode="ROWS", # this doesn't work when I want two rows with the same color
         text_align="CENTER",
     ) as table:
+        # get current style for the table
+        fontface = pdf.font_face()
+
         # fpdf table expects the header to be in the first row
         # in an iterable. Dataframes store them seperately, so we
         # must combine them for this to work nicely
-        for data_row in [list(roster)] + roster.values.tolist():
+        for n, data_row in enumerate([normal_cols] + roster.values.tolist()):
             row = table.row()
-            for datum in data_row:
-                row.cell(datum)
+            # this works
+            # so I need to enumerate it and count.
+            if n % 2 == 0:
+                fontface.fill_color = 200 # shaded gray
+            else:
+                fontface.fill_color = 255 # white
+
+            for n, datum in enumerate(data_row):
+                if n >= len(normal_cols):
+                    # FIXME: keep correct shading.
+                    if not pd.isna(datum):
+                        extra_row = table.row(style=row.style)
+
+                        extra_row.cell(datum, colspan=len(normal_cols),style=fontface, )
+                elif pd.isna(datum):
+                    row.cell("")
+                else:
+                    row.cell(datum)
 
     pdf.output(file_path)
     logger.debug(f"created pdf {file_path}")
 
 
-def print_roster(roster: pd.DataFrame, title: str, directory: os.PathLike) -> None:
+def print_roster(roster: pd.DataFrame, title: str, tempdir: os.PathLike, **kwargs) -> None:
     """Prints a `roster` with the title: `title`"""
 
-    tmp_file_path = os.path.join(directory, f"{title}.pdf")
-    roster_to_pdf(roster, tmp_file_path, title=title)
+    tmp_file_path = os.path.join(tempdir, f"{title}.pdf")
+    roster_to_pdf(roster, tmp_file_path, title=title, **kwargs)
 
     if PRINT_ROSTERS is True:
         logger.info(f"printing {title}.pdf")
@@ -132,8 +155,9 @@ def print_roster(roster: pd.DataFrame, title: str, directory: os.PathLike) -> No
         os.startfile(tmp_file_path, "open")
 
 
-def print_all_sessions(roster: pd.DataFrame, config: dict) -> None:
-    """Prints all unique sessions in roster, 1 per page"""
+def print_all_sessions(roster: pd.DataFrame, **kwargs) -> None:
+    """Prints all unique sessions in roster, max one per page"""
+
     # to use the os print utils, the item to print must be a file
     # using TemporaryDirectory() is nicer for cleanup
     # but hard to debug, hence the flag
@@ -145,9 +169,8 @@ def print_all_sessions(roster: pd.DataFrame, config: dict) -> None:
                 logger.debug(f"printing session of name: {session}")
                 # FIXME: is this the best way to query a variable col name?
                 session_df = roster.query(f"{config['class-column-name']} == @session")[config["columns-to-print"]]
-                # session_df = filter_roster_columns(roster_df, config["columns-to-print"])
                 logger.debug(f"{session_df}")
-                print_roster(session_df, title=f"{session} {config['title-suffix']}", directory=tempdir)
+                print_roster(session_df, title=f"{session} {config['title-suffix']}", tempdir=tempdir, **kwargs)
             # Without this wait, the files get deleted before the print spooler gets them
             logging.info("waiting for print spooler to receive files")
             time.sleep(10)
@@ -158,30 +181,32 @@ def print_all_sessions(roster: pd.DataFrame, config: dict) -> None:
             os.mkdir(tempdir)
         for session in pd.unique(roster[config["class-column-name"]].values):
             logger.debug(f"printing session of name: {session}")
-
             # FIXME: is this the best way to query a variable col name?
-            session_df = roster.query(f"{config['class-column-name']} == @session")
-
-            # filter to just the desired columns
-            session_df = session_df[config["columns-to-print"]]
+            session_df = roster.query(f"{config['class-column-name']} == @session")[config["columns-to-print"]]
             logger.debug(f"{session_df}")
-            print_roster(session_df, title=f"{session} {config['title-suffix']}", directory=tempdir)
+            print_roster(session_df, title=f"{session} {config['title-suffix']}", tempdir=tempdir, **kwargs)
+        logging.info("All files should be opened now, waiting 30s before exiting")
         time.sleep(30)
-    
+
 if __name__ == "__main__":
     # configure logging
     logging.basicConfig(stream=sys.stdout, level=LOG_LEVEL)
 
-    # get config
+    # get config, accessed globally
     CONFIG_FILE = os.getenv("CONFIG_FILE", "./config.yaml")
     logger.debug(f"{CONFIG_FILE=}")
-
     with open(CONFIG_FILE, encoding="utf-8") as f:
         config = yaml.safe_load(f)
     check_for_required_config(config)
 
     newest_spreadsheet = find_latest_spreadsheet(config["search-dir"],
                                                  config["spreadsheet-pattern"])
+
+    # start collecting metadata
+    metadata = {}
+    metadata['spreadsheet_mtime'] = os.path.getmtime(newest_spreadsheet)
+    metadata['date_printed'] = datetime.now()
+
     # splitext() returns a tuple of (filename, extension)
     # we only want the extension, so we take the second element
     # and slice off the first character (the dot)
@@ -192,18 +217,22 @@ if __name__ == "__main__":
         logger.debug(f"Read roster_df from {newest_spreadsheet}")
         if extension == "csv":
             roster_df = pd.read_csv(f)
-        elif extension in ["xls", "xlsx", "xlsm", "xlsb", "odf", "ods", "odt"]: 
+        elif extension in ["xls", "xlsx", "xlsm", "xlsb", "odf", "ods", "odt"]:
             # list taken from https://pandas.pydata.org/docs/reference/api/pandas.read_excel.html
             roster_df = pd.read_excel(f)
         else:
             logger.error(f"File type not supported: {newest_spreadsheet}")
-            raise(ValueError(f"File type not supported: {newest_spreadsheet}"))
+            raise ValueError(f"File type not supported: {newest_spreadsheet}")
 
     logger.debug(f"{roster_df=}")
+    session_date = roster_df[config.get("date-column")].values[0]
+    if config.get('date-format', ""):
+        metadata['session_date_str'] = dateparser.parse(session_date).strftime(config['date-format'])
+    else:
+        metadata['session_date_str'] = session_date
 
     if "modify-columns" in config.keys():
         logger.debug("modifying columns")
-        # roster_df = modify_roster_columns(roster_df, config["modify-columns"])
         for modify_data in config["modify-columns"]:
             if modify_data["new-name"] in roster_df.columns:
                 raise ValueError(f"new column name {modify_data['new-name']} already exists in roster")
@@ -214,6 +243,6 @@ if __name__ == "__main__":
 
         logger.debug(f"{roster_df.info()=}")
 
-    print_all_sessions(roster_df, config)
+    print_all_sessions(roster_df, **metadata)
 
     logger.info("Printing complete! Please close the window")
