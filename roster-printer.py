@@ -120,7 +120,6 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title, **kwargs) -> None:
             row = table.row()
             # this works
             # so I need to enumerate it and count.
-            # this works.
             if n % 2 == 0:
                 fontface.fill_color = 200 # shaded gray
             else:
