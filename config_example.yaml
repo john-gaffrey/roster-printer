@@ -22,6 +22,15 @@ modify-columns:
   old-columns: 
     - "[Parent] Phone"
   seperator: " "
+# optional
+# if provided, the value in this column (which should be the same for all rows)
+# will be printed under the title as is (unless date-format is specified)
+date-column: Session Date
+# optional
+# formats the date-column data
+# example: "%m/%d/%y %H:%M:%S"
+# see: https://docs.python.org/3.13/library/datetime.html#strftime-and-strptime-format-codes
+date-format: "%m/%d/%y"
 # a list of columns to print in the order they should be printed
 # the columns must be in the orignnal spreadsheet
 # OR the new column names from the modify-columns list
@@ -34,3 +43,16 @@ columns-to-print:
 class-column-name: Session
 # appended to the contents of the class column name 
 title-suffix: "Roster"
+# optional
+# Either 'P' for portrait or 'L' for landscape
+# if not specified, defaults to portrait
+orientation: P
+# optional
+# adds the print time to the footer
+# default is false
+show-print-date: True
+# optional
+# adds the spreadsheet modiefied time to the footer
+# default is false
+show-modified-time: True
+# optional
