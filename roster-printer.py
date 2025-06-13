@@ -111,7 +111,7 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title, **kwargs) -> None:
         text_align="CENTER",
     ) as table:
         # get current style for the table
-        fontface = pdf.font_face() 
+        fontface = pdf.font_face()
 
         # fpdf table expects the header to be in the first row
         # in an iterable. Dataframes store them seperately, so we
@@ -130,7 +130,7 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title, **kwargs) -> None:
                     # FIXME: keep correct shading.
                     if not pd.isna(datum):
                         extra_row = table.row(style=row.style)
-                        
+
                         extra_row.cell(datum, colspan=len(normal_cols),style=fontface, )
                 elif pd.isna(datum):
                     row.cell("")
@@ -169,7 +169,6 @@ def print_all_sessions(roster: pd.DataFrame, **kwargs) -> None:
                 logger.debug(f"printing session of name: {session}")
                 # FIXME: is this the best way to query a variable col name?
                 session_df = roster.query(f"{config['class-column-name']} == @session")[config["columns-to-print"]]
-                # session_df = filter_roster_columns(roster_df, config["columns-to-print"])
                 logger.debug(f"{session_df}")
                 print_roster(session_df, title=f"{session} {config['title-suffix']}", tempdir=tempdir, **kwargs)
             # Without this wait, the files get deleted before the print spooler gets them
@@ -182,12 +181,8 @@ def print_all_sessions(roster: pd.DataFrame, **kwargs) -> None:
             os.mkdir(tempdir)
         for session in pd.unique(roster[config["class-column-name"]].values):
             logger.debug(f"printing session of name: {session}")
-
             # FIXME: is this the best way to query a variable col name?
-            session_df = roster.query(f"{config['class-column-name']} == @session")
-
-            # filter to just the desired columns
-            session_df = session_df[config["columns-to-print"]]
+            session_df = roster.query(f"{config['class-column-name']} == @session")[config["columns-to-print"]]
             logger.debug(f"{session_df}")
             print_roster(session_df, title=f"{session} {config['title-suffix']}", tempdir=tempdir, **kwargs)
         logging.info("All files should be opened now, waiting 30s before exiting")
@@ -222,7 +217,7 @@ if __name__ == "__main__":
         logger.debug(f"Read roster_df from {newest_spreadsheet}")
         if extension == "csv":
             roster_df = pd.read_csv(f)
-        elif extension in ["xls", "xlsx", "xlsm", "xlsb", "odf", "ods", "odt"]: 
+        elif extension in ["xls", "xlsx", "xlsm", "xlsb", "odf", "ods", "odt"]:
             # list taken from https://pandas.pydata.org/docs/reference/api/pandas.read_excel.html
             roster_df = pd.read_excel(f)
         else:
