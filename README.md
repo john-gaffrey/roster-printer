@@ -21,3 +21,5 @@ Usage:
     * linux steps: 
         * coming soon
 * run
+
+The fonts are from https://www.gnu.org/software/freefont/
