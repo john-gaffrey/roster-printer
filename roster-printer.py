@@ -27,7 +27,7 @@ class RosterPDF(FPDF):
     def footer(self):
         # Position cursor at 1.5 cm from bottom:
         self.set_y(-15)
-        self.set_font("helvetica", style="I", size=8)
+        self.set_font("free-serif", style="I", size=8)
         self.cell(0, 10, self.footer_str, align="R")
 
 def find_latest_spreadsheet(search_dir: str, search_str: str) -> os.PathLike:
@@ -37,7 +37,6 @@ def find_latest_spreadsheet(search_dir: str, search_str: str) -> os.PathLike:
     newest_file = ""
 
     files = os.listdir(search_dir)
-    # matching_files = [file for file in files if file.contains(search_str)]
 
     for filename in files:
         if search_str not in filename:
@@ -52,6 +51,11 @@ def find_latest_spreadsheet(search_dir: str, search_str: str) -> os.PathLike:
             logger.debug(f"new latest files: {newest_file=}")
 
     logger.debug(f"{newest_file=}")
+
+    if not newest_file:
+        logger.error("No file found, check path and search string")
+        raise FileNotFoundError("No file found, check path and search string")
+
     return newest_file
 
 
@@ -92,29 +96,32 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title, **kwargs) -> None:
                format="Letter",
                unit="pt",
                footer_str=footer_str)
+    pdf.add_font("free-serif", style="", fname="FreeSerif.ttf")
+    pdf.add_font("free-serif", style="B", fname="FreeSerifBold.ttf")
+    pdf.add_font("free-serif", style="I", fname="FreeSerifItalic.ttf")
+    pdf.add_font("free-serif", style="BI", fname="FreeSerifBoldItalic.ttf")
+
     pdf.set_title(title)
     pdf.add_page()
 
     # create header
-    pdf.set_font('helvetica', size=24)
+    pdf.set_font('free-serif', size=24)
     pdf.cell(text=title, new_y="NEXT", align="C", center=True)
     if session_date_str:
         pdf.cell(text=session_date_str, new_y="NEXT", align="C", center=True)
     pdf.ln(20)
 
     # add table
-    pdf.set_font('helvetica', size=12)
+    pdf.set_font('free-serif', size=12)
     with pdf.table(
         borders_layout="MINIMAL",
-        # cell_fill_color=200,
-        # cell_fill_mode="ROWS", # this doesn't work when I want two rows with the same color
         text_align="CENTER",
     ) as table:
         # get current style for the table
         fontface = pdf.font_face()
 
         # fpdf table expects the header to be in the first row
-        # in an iterable. Dataframes store them seperately, so we
+        # in an iterable. Dataframes store them separately, so we
         # must combine them for this to work nicely
         for n, data_row in enumerate([normal_cols] + roster.values.tolist()):
             row = table.row()
@@ -148,10 +155,10 @@ def print_roster(roster: pd.DataFrame, title: str, tempdir: os.PathLike, **kwarg
     roster_to_pdf(roster, tmp_file_path, title=title, **kwargs)
 
     if PRINT_ROSTERS is True:
-        logger.info(f"printing {title}.pdf")
+        logger.info(f"printing {tempdir}/{title}.pdf")
         os.startfile(tmp_file_path, "print")
     else:
-        logger.info(f"opening {title}.pdf")
+        logger.info(f"opening {tempdir}/{title}.pdf")
         os.startfile(tmp_file_path, "open")
 
 
