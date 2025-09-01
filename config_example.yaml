@@ -6,22 +6,22 @@ spreadsheet-pattern: "db-output"
 # can merge or just rename by including only one old-column
 # the new column name must not exist already
 # the columns are joined in the order listed
-# and separated by the specified seperator
+# and separated by the specified separator
 modify-columns:
 - new-name: Name
   old-columns: 
     - "[Child] First Name"
     - "[Child] Last Name"
-  seperator: " "
+  separator: " "
 - new-name: Contact
   old-columns: 
     - "[Parent] First Name"
     - "[Parent] Last Name"
-  seperator: " "
+  separator: " "
 - new-name: Contact Number
   old-columns: 
     - "[Parent] Phone"
-  seperator: " "
+  separator: " "
 # optional
 # if provided, the value in this column (which should be the same for all rows)
 # will be printed under the title as is (unless date-format is specified)
