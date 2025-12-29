@@ -56,3 +56,10 @@ show-print-date: True
 # default is false
 show-modified-time: True
 # optional
+# specifies the relative location to a directory containing:
+# - FreeSerif.ttf
+# - FreeSerifBold.ttf
+# - FreeSerifItalic.ttf
+# - FreeSerifBoldItalic.ttf
+# default is `fonts`
+fonts-dir: fonts

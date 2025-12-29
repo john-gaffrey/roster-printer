@@ -96,10 +96,12 @@ def roster_to_pdf(roster: pd.DataFrame, file_path, title, **kwargs) -> None:
                format="Letter",
                unit="pt",
                footer_str=footer_str)
-    pdf.add_font("free-serif", style="", fname="FreeSerif.ttf")
-    pdf.add_font("free-serif", style="B", fname="FreeSerifBold.ttf")
-    pdf.add_font("free-serif", style="I", fname="FreeSerifItalic.ttf")
-    pdf.add_font("free-serif", style="BI", fname="FreeSerifBoldItalic.ttf")
+    
+    fonts_dir = config.get("fonts-dir", "fonts")
+    pdf.add_font("free-serif", style="", fname=os.path.join(fonts_dir, "FreeSerif.ttf"))
+    pdf.add_font("free-serif", style="B", fname=os.path.join(fonts_dir, "FreeSerifBold.ttf"))
+    pdf.add_font("free-serif", style="I", fname=os.path.join(fonts_dir, "FreeSerifItalic.ttf"))
+    pdf.add_font("free-serif", style="BI", fname=os.path.join(fonts_dir, "FreeSerifBoldItalic.ttf"))
 
     pdf.set_title(title)
     pdf.add_page()
